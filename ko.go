@@ -1,4 +1,4 @@
-package lvlmap
+package ko
 
 import (
 	"encoding/json"
