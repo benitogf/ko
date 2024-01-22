@@ -22,6 +22,7 @@ import (
 type Storage struct {
 	Path            string
 	mem             sync.Map
+	memMutex        sync.Map
 	noBroadcastKeys []string
 	client          *leveldb.DB
 	mutex           sync.RWMutex
@@ -309,6 +310,23 @@ func (db *Storage) GetDecodedList(path string) ([]meta.Object, error) {
 	})
 
 	return res, nil
+}
+
+func (db *Storage) GetAndLock(path string) ([]byte, error) {
+	newLock := sync.Mutex{}
+	lock, _ := db.memMutex.LoadOrStore(path, &newLock)
+	lock.(*sync.Mutex).Lock()
+	return db.Get(path)
+}
+
+func (db *Storage) SetAndUnlock(path string, data json.RawMessage) (string, error) {
+	lock, found := db.memMutex.Load(path)
+	if !found {
+		return "", errors.New("ooo: lock not found can't unlock")
+	}
+	res, err := db.Set(path, data)
+	lock.(*sync.Mutex).Unlock()
+	return res, err
 }
 
 // Peek a value timestamps
