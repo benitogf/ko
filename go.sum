@@ -6,8 +6,6 @@ github.com/benitogf/jsondiff v0.0.0-20220926080659-c3db9b84b559 h1:0ERndS9JkEvEq
 github.com/benitogf/jsondiff v0.0.0-20220926080659-c3db9b84b559/go.mod h1:gg2qmcNCGq/FXh5kQpsaEIf6GebYe2JMKrDSqZkuImc=
 github.com/benitogf/jsonpatch v0.0.0-20220924150135-fc4b5c761ac7 h1:bD4MAvpNi2d2kE/gbgRqQAs2ulu36brqQpv2olg8hqk=
 github.com/benitogf/jsonpatch v0.0.0-20220924150135-fc4b5c761ac7/go.mod h1:O1Z+hTPUrXzHUjmKlpmNYK9wcncZ5rS3K8PqItDO0x0=
-github.com/benitogf/ooo v0.0.0-20240122040335-e224b700d3b3 h1:6o/R7Jp7wrSTVpBrTmHqqu0VMvk9eOGp0Otlk1EYlnc=
-github.com/benitogf/ooo v0.0.0-20240122040335-e224b700d3b3/go.mod h1:0AMo1Jdi4LDAW+N/m91Ojt2tDAyYcwzkjbXKqs6jE9k=
 github.com/benitogf/ooo v0.0.0-20240131094252-adc03bd49179 h1:OA3LQTfpyvNHVblLvTRVEEfagz9eraqHRudgayRBcuE=
 github.com/benitogf/ooo v0.0.0-20240131094252-adc03bd49179/go.mod h1:0AMo1Jdi4LDAW+N/m91Ojt2tDAyYcwzkjbXKqs6jE9k=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
