@@ -3,7 +3,7 @@ module github.com/benitogf/ko
 go 1.21.3
 
 require (
-	github.com/benitogf/ooo v0.0.0-20240122040335-e224b700d3b3
+	github.com/benitogf/ooo v0.0.0-20240131094252-adc03bd49179
 	github.com/syndtr/goleveldb v1.0.0
 )
 
@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
