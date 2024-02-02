@@ -214,7 +214,7 @@ func (db *Storage) GetNRange(path string, limit int, from, to int64) ([]meta.Obj
 		return true
 	})
 
-	sort.Slice(res, meta.Sort(res))
+	sort.Slice(res, meta.SortDesc(res))
 
 	if len(res) > limit {
 		return res[:limit], nil
@@ -223,8 +223,7 @@ func (db *Storage) GetNRange(path string, limit int, from, to int64) ([]meta.Obj
 	return res, nil
 }
 
-// GetN get last N elements of a path related value(s)
-func (db *Storage) GetN(path string, limit int) ([]meta.Object, error) {
+func (db *Storage) getN(path string, limit int, order string) ([]meta.Object, error) {
 	res := []meta.Object{}
 	if !strings.Contains(path, "*") {
 		return res, errors.New("katamari: invalid pattern")
@@ -248,7 +247,11 @@ func (db *Storage) GetN(path string, limit int) ([]meta.Object, error) {
 		return true
 	})
 
-	sort.Slice(res, meta.Sort(res))
+	if order == "asc" {
+		sort.Slice(res, meta.SortAsc(res))
+	} else {
+		sort.Slice(res, meta.SortDesc(res))
+	}
 
 	if len(res) > limit {
 		return res[:limit], nil
@@ -257,8 +260,16 @@ func (db *Storage) GetN(path string, limit int) ([]meta.Object, error) {
 	return res, nil
 }
 
-// Get a key/pattern related value(s)
-func (db *Storage) Get(path string) ([]byte, error) {
+// GetN get last N elements of a path related value(s)
+func (db *Storage) GetN(path string, limit int) ([]meta.Object, error) {
+	return db.getN(path, limit, "desc")
+}
+
+func (db *Storage) GetNAscending(path string, limit int) ([]meta.Object, error) {
+	return db.getN(path, limit, "asc")
+}
+
+func (db *Storage) get(path string, order string) ([]byte, error) {
 	if !strings.Contains(path, "*") {
 		data, found := db.mem.Load(path)
 		if !found {
@@ -283,9 +294,22 @@ func (db *Storage) Get(path string) ([]byte, error) {
 		return true
 	})
 
-	sort.Slice(res, meta.Sort(res))
+	if order == "asc" {
+		sort.Slice(res, meta.SortAsc(res))
+	} else {
+		sort.Slice(res, meta.SortDesc(res))
+	}
 
 	return meta.Encode(res)
+}
+
+// Get a key/pattern related value(s)
+func (db *Storage) Get(path string) ([]byte, error) {
+	return db.get(path, "asc")
+}
+
+func (db *Storage) GetDescending(path string) ([]byte, error) {
+	return db.get(path, "desc")
 }
 
 // GetDecodedList force base64 decoding and bypass sorting
@@ -327,6 +351,15 @@ func (db *Storage) SetAndUnlock(path string, data json.RawMessage) (string, erro
 	res, err := db.Set(path, data)
 	lock.(*sync.Mutex).Unlock()
 	return res, err
+}
+
+func (db *Storage) Unlock(path string) error {
+	lock, found := db.memMutex.Load(path)
+	if !found {
+		return errors.New("ooo: lock not found can't unlock")
+	}
+	lock.(*sync.Mutex).Unlock()
+	return nil
 }
 
 // Peek a value timestamps
