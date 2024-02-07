@@ -3,7 +3,7 @@ module github.com/benitogf/ko
 go 1.21.3
 
 require (
-	github.com/benitogf/ooo v0.0.0-20240131094252-adc03bd49179
+	github.com/benitogf/ooo v0.0.0-20240207045118-931a7b58d317
 	github.com/syndtr/goleveldb v1.0.0
 )
 

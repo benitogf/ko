@@ -120,6 +120,20 @@ func (db *Storage) Close() {
 	db.watcher = nil
 }
 
+func (db *Storage) _getLock(path string) *sync.Mutex {
+	newLock := sync.Mutex{}
+	lock, _ := db.memMutex.LoadOrStore(path, &newLock)
+	return lock.(*sync.Mutex)
+}
+
+func (db *Storage) _loadLock(path string) (*sync.Mutex, error) {
+	lock, found := db.memMutex.Load(path)
+	if !found {
+		return nil, errors.New("ooo: lock not found can't unlock")
+	}
+	return lock.(*sync.Mutex), nil
+}
+
 // Clear all keys in the storage
 func (db *Storage) Clear() {
 	db.mem.Range(func(key interface{}, value interface{}) bool {
@@ -337,19 +351,24 @@ func (db *Storage) GetDecodedList(path string) ([]meta.Object, error) {
 }
 
 func (db *Storage) GetAndLock(path string) ([]byte, error) {
-	newLock := sync.Mutex{}
-	lock, _ := db.memMutex.LoadOrStore(path, &newLock)
-	lock.(*sync.Mutex).Lock()
+	if strings.Contains(path, "*") {
+		return []byte{}, errors.New("ooo: can't lock a glob pattern path")
+	}
+	lock := db._getLock(path)
+	lock.Lock()
 	return db.Get(path)
 }
 
 func (db *Storage) SetAndUnlock(path string, data json.RawMessage) (string, error) {
-	lock, found := db.memMutex.Load(path)
-	if !found {
-		return "", errors.New("ooo: lock not found can't unlock")
+	if strings.Contains(path, "*") {
+		return "", errors.New("ooo: can't lock a glob pattern path")
+	}
+	lock, err := db._loadLock(path)
+	if err != nil {
+		return "", err
 	}
 	res, err := db.Set(path, data)
-	lock.(*sync.Mutex).Unlock()
+	lock.Unlock()
 	return res, err
 }
 
