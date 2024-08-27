@@ -118,3 +118,12 @@ func TestStreamItemGlobBroadcastLevel(t *testing.T) {
 	defer app.Close(os.Interrupt)
 	ooo.StreamItemGlobBroadcastTest(t, &app)
 }
+
+func TestBatchSet(t *testing.T) {
+	app := &ooo.Server{}
+	app.Silence = true
+	app.Storage = &Storage{Path: "test/db6" + ooo.Time()}
+	app.Start("localhost:0")
+	defer app.Close(os.Interrupt)
+	ooo.StorageBatchSetTest(app, t, 10)
+}

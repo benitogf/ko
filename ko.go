@@ -11,6 +11,7 @@ import (
 
 	"github.com/benitogf/ooo"
 	"github.com/benitogf/ooo/key"
+	"github.com/benitogf/ooo/merge"
 	"github.com/benitogf/ooo/meta"
 	"github.com/syndtr/goleveldb/leveldb"
 	errorsLeveldb "github.com/syndtr/goleveldb/leveldb/errors"
@@ -169,7 +170,7 @@ func (db *Storage) Keys() ([]byte, error) {
 func (db *Storage) KeysRange(path string, from, to int64) ([]string, error) {
 	keys := []string{}
 	if !strings.Contains(path, "*") {
-		return keys, errors.New("katamari: invalid pattern")
+		return keys, ooo.ErrInvalidPath
 	}
 
 	if to < from {
@@ -197,7 +198,7 @@ func (db *Storage) KeysRange(path string, from, to int64) ([]string, error) {
 func (db *Storage) GetNRange(path string, limit int, from, to int64) ([]meta.Object, error) {
 	res := []meta.Object{}
 	if !strings.Contains(path, "*") {
-		return res, errors.New("katamari: invalid pattern")
+		return res, ooo.ErrInvalidPath
 	}
 
 	if limit <= 0 {
@@ -240,7 +241,7 @@ func (db *Storage) GetNRange(path string, limit int, from, to int64) ([]meta.Obj
 func (db *Storage) getN(path string, limit int, order string) ([]meta.Object, error) {
 	res := []meta.Object{}
 	if !strings.Contains(path, "*") {
-		return res, errors.New("katamari: invalid pattern")
+		return res, ooo.ErrInvalidPath
 	}
 
 	if limit <= 0 {
@@ -287,7 +288,7 @@ func (db *Storage) get(path string, order string) ([]byte, error) {
 	if !strings.Contains(path, "*") {
 		data, found := db.mem.Load(path)
 		if !found {
-			return []byte(""), errors.New("katamari: not found")
+			return []byte(""), ooo.ErrNotFound
 		}
 
 		return data.([]byte), nil
@@ -326,11 +327,10 @@ func (db *Storage) GetDescending(path string) ([]byte, error) {
 	return db.get(path, "desc")
 }
 
-// GetDecodedList force base64 decoding and bypass sorting
 func (db *Storage) GetDecodedList(path string) ([]meta.Object, error) {
 	res := []meta.Object{}
 	if !strings.Contains(path, "*") {
-		return res, errors.New("katamari: invalid pattern")
+		return res, ooo.ErrInvalidPath
 	}
 
 	db.mem.Range(func(k interface{}, value interface{}) bool {
@@ -396,12 +396,9 @@ func (db *Storage) Peek(key string, now int64) (int64, int64) {
 	return oldObject.Created, now
 }
 
-// Set a value
-func (db *Storage) Set(path string, data json.RawMessage) (string, error) {
-	now := time.Now().UTC().UnixNano()
+func (db *Storage) _set(path string, data json.RawMessage, now int64) (string, error) {
 	index := key.LastIndex(path)
 	created, updated := db.Peek(path, now)
-
 	aux := meta.New(&meta.Object{
 		Created: created,
 		Updated: updated,
@@ -416,15 +413,142 @@ func (db *Storage) Set(path string, data json.RawMessage) (string, error) {
 		return "", err
 	}
 
-	if !key.Contains(db.noBroadcastKeys, path) {
-		db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
-	}
-
 	return index, nil
 }
 
-// SetForce set entries on a pivot instance (force created/updated values)
-func (db *Storage) SetForce(path string, data json.RawMessage, created int64, updated int64) (string, error) {
+// Set a value
+func (db *Storage) Set(path string, data json.RawMessage) (string, error) {
+	if !key.IsValid(path) {
+		return path, ooo.ErrInvalidPath
+	}
+	if len(data) == 0 {
+		return path, errors.New("ooo: invalid storage data (empty)")
+	}
+	now := time.Now().UTC().UnixNano()
+
+	if !strings.Contains(path, "*") {
+		index, err := db._set(path, data, now)
+		if err != nil {
+			return path, err
+		}
+
+		if !key.Contains(db.noBroadcastKeys, path) {
+			db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+		}
+
+		return index, nil
+	}
+
+	keys := []string{}
+	db.mem.Range(func(_key interface{}, value interface{}) bool {
+		current := _key.(string)
+		if !key.Match(path, current) {
+			return true
+		}
+		keys = append(keys, current)
+		return true
+	})
+
+	// batch set
+	for _, key := range keys {
+		_, err := db._set(key, data, now)
+		if err != nil {
+			return path, err
+		}
+	}
+
+	if !key.Contains(db.noBroadcastKeys, path) && db.Active() {
+		db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+	}
+
+	return path, nil
+}
+
+func (db *Storage) _patch(path string, data json.RawMessage, now int64) (string, error) {
+	raw, found := db.mem.Load(path)
+	if !found {
+		return path, ooo.ErrNotFound
+	}
+
+	obj, err := meta.Decode(raw.([]byte))
+	if err != nil {
+		return path, err
+	}
+
+	merged, info, err := merge.MergeBytes(obj.Data, data)
+	if err != nil {
+		return path, err
+	}
+
+	if len(info.Replaced) == 0 {
+		return path, ooo.ErrNoop
+	}
+
+	index := key.LastIndex(path)
+	created, updated := db.Peek(path, now)
+	aux := meta.New(&meta.Object{
+		Created: created,
+		Updated: updated,
+		Index:   index,
+		Path:    path,
+		Data:    merged,
+	})
+
+	db.mem.Store(path, aux)
+	err = db.client.Put([]byte(path), aux, nil)
+
+	return path, err
+}
+
+// Set a value to matching keys
+func (db *Storage) Patch(path string, data json.RawMessage) (string, error) {
+	if !key.IsValid(path) {
+		return path, ooo.ErrInvalidPath
+	}
+	if len(data) == 0 {
+		return path, errors.New("ooo: invalid storage data (empty)")
+	}
+
+	now := time.Now().UTC().UnixNano()
+	if !strings.Contains(path, "*") {
+		index, err := db._patch(path, data, now)
+		if err != nil {
+			return path, err
+		}
+
+		if !key.Contains(db.noBroadcastKeys, path) && db.Active() {
+			db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+		}
+		return index, nil
+	}
+
+	keys := []string{}
+	db.mem.Range(func(_key interface{}, value interface{}) bool {
+		current := _key.(string)
+		if !key.Match(path, current) {
+			return true
+		}
+		keys = append(keys, current)
+		return true
+	})
+
+	// batch patch
+	for _, key := range keys {
+		_, err := db._patch(key, data, now)
+		if err != nil {
+			return path, err
+		}
+	}
+
+	if !key.Contains(db.noBroadcastKeys, path) && db.Active() {
+		db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+	}
+
+	return path, nil
+}
+
+// SetWithMeta set entries with metadata created/updated values
+func (db *Storage) SetWithMeta(path string, data json.RawMessage, created int64, updated int64) (string, error) {
 	index := key.LastIndex(path)
 	aux := meta.New(&meta.Object{
 		Created: created,
@@ -453,13 +577,13 @@ func (db *Storage) Del(path string) error {
 	if !strings.Contains(path, "*") {
 		_, found := db.mem.Load(path)
 		if !found {
-			return errors.New("katamari: not found")
+			return ooo.ErrNotFound
 		}
 		db.mem.Delete(path)
 
 		_, err = db.client.Get([]byte(path), nil)
 		if err != nil && err.Error() == "leveldb: not found" {
-			return errors.New("katamari: not found")
+			return ooo.ErrNotFound
 		}
 
 		if err != nil {
