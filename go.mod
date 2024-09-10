@@ -2,10 +2,8 @@ module github.com/benitogf/ko
 
 go 1.22
 
-toolchain go1.22.0
-
 require (
-	github.com/benitogf/ooo v0.0.0-20240827043050-b1a80a57a649
+	github.com/benitogf/ooo v0.0.0-20240910090952-571808a9d5b6
 	github.com/syndtr/goleveldb v1.0.0
 )
 
@@ -24,13 +22,13 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/pkg/expect v0.0.0-20191209053905-1fe4c9394a8a // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rs/cors v1.11.0 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/tidwall/gjson v1.17.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
-	golang.org/x/net v0.28.0 // indirect
-	golang.org/x/sys v0.23.0 // indirect
+	golang.org/x/net v0.29.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
