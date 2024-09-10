@@ -56,7 +56,7 @@ func TestStreamGlobBroadcastConcurrentMemory(t *testing.T) {
 	app.ForcePatch = true
 	app.Start("localhost:0")
 	defer app.Close(os.Interrupt)
-	ooo.StreamGlobBroadcastConcurretTest(t, &app, 3)
+	ooo.StreamConcurrentTest(t, &app, 3)
 }
 
 func TestStreamBroadcastFilter(t *testing.T) {
