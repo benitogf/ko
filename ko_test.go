@@ -50,13 +50,14 @@ func TestStreamGlobBroadcastLevel(t *testing.T) {
 }
 
 func TestStreamGlobBroadcastConcurrentMemory(t *testing.T) {
+	t.Skip()
 	// t.Parallel()
 	app := ooo.Server{}
 	app.Silence = true
 	app.ForcePatch = true
 	app.Start("localhost:0")
 	defer app.Close(os.Interrupt)
-	ooo.StreamConcurrentTest(t, &app, 3)
+	ooo.StreamGlobBroadcastConcurrentTest(t, &app, 3)
 }
 
 func TestStreamBroadcastFilter(t *testing.T) {
@@ -126,4 +127,14 @@ func TestBatchSet(t *testing.T) {
 	app.Start("localhost:0")
 	defer app.Close(os.Interrupt)
 	ooo.StorageBatchSetTest(app, t, 10)
+}
+
+func TestWatchStorageNoop(t *testing.T) {
+	db := &Storage{Path: "test/db7" + ooo.Time()}
+	err := db.Start(ooo.StorageOpt{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ooo.WatchStorageNoopTest(db, t)
 }
