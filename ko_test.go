@@ -50,11 +50,13 @@ func TestStreamGlobBroadcastLevel(t *testing.T) {
 }
 
 func TestStreamGlobBroadcastConcurrentMemory(t *testing.T) {
-	t.Skip()
-	// t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
 	app := ooo.Server{}
 	app.Silence = true
 	app.ForcePatch = true
+	app.Storage = &Storage{Path: "test/db8" + ooo.Time()}
 	app.Start("localhost:0")
 	defer app.Close(os.Interrupt)
 	ooo.StreamGlobBroadcastConcurrentTest(t, &app, 3)
@@ -130,6 +132,9 @@ func TestBatchSet(t *testing.T) {
 }
 
 func TestWatchStorageNoop(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
 	db := &Storage{Path: "test/db7" + ooo.Time()}
 	err := db.Start(ooo.StorageOpt{})
 	if err != nil {

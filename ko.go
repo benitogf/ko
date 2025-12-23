@@ -27,7 +27,7 @@ type Storage struct {
 	noBroadcastKeys []string
 	client          *leveldb.DB
 	mutex           sync.RWMutex
-	watcher         ooo.StorageChan
+	watcher         *ooo.ShardedStorageChan
 	storage         *ooo.Storage
 	beforeRead      func(key string)
 }
@@ -64,9 +64,12 @@ func (db *Storage) Start(storageOpt ooo.StorageOpt) error {
 		db.Path = "data/db"
 	}
 
-	if db.watcher == nil {
-		db.watcher = make(ooo.StorageChan)
+	// Create sharded watcher for per-key ordering
+	workers := storageOpt.Workers
+	if workers <= 0 {
+		workers = 6 // default
 	}
+	db.watcher = ooo.NewShardedStorageChan(workers)
 
 	db.client, err = leveldb.OpenFile(db.Path, &opt.Options{})
 
@@ -124,7 +127,7 @@ func (db *Storage) Close() {
 	db.storage.Active = false
 	db.client.Close()
 	if db.watcher != nil {
-		close(db.watcher)
+		db.watcher.Close()
 		db.watcher = nil
 	}
 }
@@ -390,7 +393,7 @@ func (db *Storage) Peek(path string, now int64) (int64, int64) {
 	return previous.(*meta.Object).Created, now
 }
 
-func (db *Storage) _set(path string, data json.RawMessage, now int64) (string, error) {
+func (db *Storage) _set(path string, data json.RawMessage, now int64) (*meta.Object, error) {
 	index := key.LastIndex(path)
 	created, updated := db.Peek(path, now)
 	obj := &meta.Object{
@@ -407,10 +410,10 @@ func (db *Storage) _set(path string, data json.RawMessage, now int64) (string, e
 	err := db.client.Put([]byte(path), encoded, nil)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return index, nil
+	return obj, nil
 }
 
 // Push stores data under a new key generated from a glob pattern path.
@@ -449,7 +452,7 @@ func (db *Storage) Push(path string, data json.RawMessage) (string, error) {
 	}
 
 	if !key.Contains(db.noBroadcastKeys, newPath) && db.Active() {
-		db.watcher <- ooo.StorageEvent{Key: newPath, Operation: "set"}
+		db.sendEvent(ooo.StorageEvent{Key: newPath, Operation: "set", Object: obj})
 	}
 
 	return index, nil
@@ -466,16 +469,16 @@ func (db *Storage) Set(path string, data json.RawMessage) (string, error) {
 	now := time.Now().UTC().UnixNano()
 
 	if !strings.Contains(path, "*") {
-		index, err := db._set(path, data, now)
+		obj, err := db._set(path, data, now)
 		if err != nil {
 			return path, err
 		}
 
 		if !key.Contains(db.noBroadcastKeys, path) {
-			db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+			db.sendEvent(ooo.StorageEvent{Key: path, Operation: "set", Object: obj})
 		}
 
-		return index, nil
+		return obj.Index, nil
 	}
 
 	keys := []string{}
@@ -488,35 +491,34 @@ func (db *Storage) Set(path string, data json.RawMessage) (string, error) {
 		return true
 	})
 
-	// batch set
-	for _, key := range keys {
-		_, err := db._set(key, data, now)
+	// batch set - broadcast each individually
+	for _, k := range keys {
+		obj, err := db._set(k, data, now)
 		if err != nil {
 			return path, err
 		}
-	}
-
-	if !key.Contains(db.noBroadcastKeys, path) && db.Active() {
-		db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+		if !key.Contains(db.noBroadcastKeys, k) && db.Active() {
+			db.sendEvent(ooo.StorageEvent{Key: k, Operation: "set", Object: obj})
+		}
 	}
 
 	return path, nil
 }
 
-func (db *Storage) _patch(path string, data json.RawMessage, now int64) (string, error) {
+func (db *Storage) _patch(path string, data json.RawMessage, now int64) (*meta.Object, error) {
 	raw, found := db.mem.Load(path)
 	if !found {
-		return path, ooo.ErrNotFound
+		return nil, ooo.ErrNotFound
 	}
 
 	obj := raw.(*meta.Object)
 	merged, info, err := merge.MergeBytes(obj.Data, data)
 	if err != nil {
-		return path, err
+		return nil, err
 	}
 
 	if len(info.Replaced) == 0 {
-		return path, ooo.ErrNoop
+		return nil, ooo.ErrNoop
 	}
 
 	index := key.LastIndex(path)
@@ -534,7 +536,7 @@ func (db *Storage) _patch(path string, data json.RawMessage, now int64) (string,
 	encoded := meta.New(newObj)
 	err = db.client.Put([]byte(path), encoded, nil)
 
-	return path, err
+	return newObj, err
 }
 
 // Set a value to matching keys
@@ -548,15 +550,15 @@ func (db *Storage) Patch(path string, data json.RawMessage) (string, error) {
 
 	now := time.Now().UTC().UnixNano()
 	if !strings.Contains(path, "*") {
-		index, err := db._patch(path, data, now)
+		obj, err := db._patch(path, data, now)
 		if err != nil {
 			return path, err
 		}
 
 		if !key.Contains(db.noBroadcastKeys, path) && db.Active() {
-			db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+			db.sendEvent(ooo.StorageEvent{Key: path, Operation: "set", Object: obj})
 		}
-		return index, nil
+		return path, nil
 	}
 
 	keys := []string{}
@@ -569,16 +571,15 @@ func (db *Storage) Patch(path string, data json.RawMessage) (string, error) {
 		return true
 	})
 
-	// batch patch
-	for _, key := range keys {
-		_, err := db._patch(key, data, now)
+	// batch patch - broadcast each individually
+	for _, k := range keys {
+		obj, err := db._patch(k, data, now)
 		if err != nil {
 			return path, err
 		}
-	}
-
-	if !key.Contains(db.noBroadcastKeys, path) && db.Active() {
-		db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+		if !key.Contains(db.noBroadcastKeys, k) && db.Active() {
+			db.sendEvent(ooo.StorageEvent{Key: k, Operation: "set", Object: obj})
+		}
 	}
 
 	return path, nil
@@ -605,7 +606,7 @@ func (db *Storage) SetWithMeta(path string, data json.RawMessage, created int64,
 	}
 
 	if !key.Contains(db.noBroadcastKeys, path) && db.Active() {
-		db.watcher <- ooo.StorageEvent{Key: path, Operation: "set"}
+		db.sendEvent(ooo.StorageEvent{Key: path, Operation: "set", Object: obj})
 	}
 
 	return index, nil
@@ -615,10 +616,11 @@ func (db *Storage) SetWithMeta(path string, data json.RawMessage, created int64,
 func (db *Storage) Del(path string) error {
 	var err error
 	if !strings.Contains(path, "*") {
-		_, found := db.mem.Load(path)
+		raw, found := db.mem.Load(path)
 		if !found {
 			return ooo.ErrNotFound
 		}
+		obj := raw.(*meta.Object)
 		db.mem.Delete(path)
 
 		_, err = db.client.Get([]byte(path), nil)
@@ -636,13 +638,16 @@ func (db *Storage) Del(path string) error {
 		}
 
 		if !key.Contains(db.noBroadcastKeys, path) {
-			db.watcher <- ooo.StorageEvent{Key: path, Operation: "del"}
+			db.sendEvent(ooo.StorageEvent{Key: path, Operation: "del", Object: obj})
 		}
 		return nil
 	}
 
+	// Collect objects to delete for broadcasting
+	var toDelete []*meta.Object
 	db.mem.Range(func(k interface{}, value interface{}) bool {
 		if key.Match(path, k.(string)) {
+			toDelete = append(toDelete, value.(*meta.Object))
 			db.mem.Delete(k.(string))
 		}
 		return true
@@ -671,15 +676,82 @@ func (db *Storage) Del(path string) error {
 		return err
 	}
 
-	if !key.Contains(db.noBroadcastKeys, path) {
-		db.watcher <- ooo.StorageEvent{Key: path, Operation: "del"}
+	// Broadcast each deleted object individually
+	for _, obj := range toDelete {
+		if !key.Contains(db.noBroadcastKeys, obj.Path) {
+			db.sendEvent(ooo.StorageEvent{Key: obj.Path, Operation: "del", Object: obj})
+		}
 	}
 	return nil
 }
 
-// Watch the storage set/del events
-func (db *Storage) Watch() ooo.StorageChan {
+// DelSilent deletes a key/pattern value(s) without broadcasting.
+// This is useful for cleanup operations where the broadcast is handled elsewhere.
+func (db *Storage) DelSilent(path string) error {
+	var err error
+	if !strings.Contains(path, "*") {
+		_, found := db.mem.Load(path)
+		if !found {
+			return ooo.ErrNotFound
+		}
+		db.mem.Delete(path)
+
+		_, err = db.client.Get([]byte(path), nil)
+		if err != nil && err.Error() == "leveldb: not found" {
+			return ooo.ErrNotFound
+		}
+
+		if err != nil {
+			return err
+		}
+
+		err = db.client.Delete([]byte(path), nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Delete from memory
+	db.mem.Range(func(k interface{}, value interface{}) bool {
+		if key.Match(path, k.(string)) {
+			db.mem.Delete(k.(string))
+		}
+		return true
+	})
+
+	// Delete from leveldb
+	globPrefixKey := strings.Split(path, "*")[0]
+	rangeKey := util.BytesPrefix([]byte(globPrefixKey + ""))
+	if globPrefixKey == "" || globPrefixKey == "*" {
+		rangeKey = nil
+	}
+	iter := db.client.NewIterator(rangeKey, nil)
+	for iter.Next() {
+		if key.Match(path, string(iter.Key())) {
+			err = db.client.Delete(iter.Key(), nil)
+			if err != nil {
+				break
+			}
+		}
+	}
+	if err != nil {
+		return err
+	}
+	iter.Release()
+	return iter.Error()
+}
+
+// WatchSharded returns the sharded storage channel for per-key ordered event processing
+func (db *Storage) WatchSharded() *ooo.ShardedStorageChan {
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
 	return db.watcher
+}
+
+// sendEvent sends an event to the sharded watcher
+func (db *Storage) sendEvent(event ooo.StorageEvent) {
+	if db.watcher != nil {
+		db.watcher.Send(event)
+	}
 }
