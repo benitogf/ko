@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/benitogf/ooo v0.0.0-20240910090952-571808a9d5b6
+	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.0
 )
 
@@ -25,7 +26,6 @@ require (
 	github.com/pkg/expect v0.0.0-20191209053905-1fe4c9394a8a // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rs/cors v1.11.1 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -34,3 +34,5 @@ require (
 	golang.org/x/sys v0.25.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/benitogf/nopog => ../nopog
