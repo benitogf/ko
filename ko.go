@@ -1,6 +1,9 @@
 package ko
 
 import (
+	"errors"
+	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -13,6 +16,9 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
+
+// ErrPathNotAccessible is returned when the database path cannot be accessed
+var ErrPathNotAccessible = errors.New("ko: database path is not accessible")
 
 // EmbeddedStorage implements storage.EmbeddedLayer using LevelDB
 // This is a pure persistence layer without in-memory caching
@@ -53,19 +59,57 @@ func (e *EmbeddedStorage) Start(layerOpt storage.LayerOptions) error {
 		e.Path = "data/db"
 	}
 
+	// Check if path is accessible before attempting to open
+	if err := checkPathAccessible(e.Path); err != nil {
+		return err
+	}
+
 	e.client, err = leveldb.OpenFile(e.Path, &opt.Options{})
 	if errorsLeveldb.IsCorrupted(err) {
 		err = e.recover()
 		if err != nil {
-			return err
+			return fmt.Errorf("ko: failed to recover corrupted database at %q: %w", e.Path, err)
 		}
 	}
 
 	if err != nil {
-		return err
+		return fmt.Errorf("ko: failed to open database at %q: %w", e.Path, err)
 	}
 
 	e.active = true
+	return nil
+}
+
+// checkPathAccessible verifies the database path can be accessed or created
+func checkPathAccessible(path string) error {
+	// Check if path exists
+	info, err := os.Stat(path)
+	if err == nil {
+		// Path exists, check if it's a directory (LevelDB uses directories)
+		if !info.IsDir() {
+			return fmt.Errorf("%w: %q exists but is not a directory", ErrPathNotAccessible, path)
+		}
+		// Check write permission by trying to create a temp file
+		testFile := path + "/.ko_write_test"
+		f, err := os.Create(testFile)
+		if err != nil {
+			return fmt.Errorf("%w: %q exists but is not writable: %v", ErrPathNotAccessible, path, err)
+		}
+		f.Close()
+		os.Remove(testFile)
+		return nil
+	}
+
+	if !os.IsNotExist(err) {
+		// Some other error (permission denied, etc.)
+		return fmt.Errorf("%w: cannot access %q: %v", ErrPathNotAccessible, path, err)
+	}
+
+	// Path doesn't exist, try to create it
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("%w: cannot create directory %q: %v", ErrPathNotAccessible, path, err)
+	}
+
 	return nil
 }
 
