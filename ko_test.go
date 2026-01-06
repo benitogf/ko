@@ -89,6 +89,30 @@ func TestStreamBroadcastFilter(t *testing.T) {
 	ooo.StreamBroadcastFilterTest(t, &server)
 }
 
+func TestStreamForcePatch(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+	monotonic.Init()
+	server := ooo.Server{}
+	server.Silence = true
+	server.Storage = newLayeredStorage("test/db_forcepatch" + ooo.Time())
+	defer server.Close(os.Interrupt)
+	ooo.StreamBroadcastForcePatchTest(t, &server)
+}
+
+func TestStreamNoPatch(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+	monotonic.Init()
+	server := ooo.Server{}
+	server.Silence = true
+	server.Storage = newLayeredStorage("test/db_nopatch" + ooo.Time())
+	defer server.Close(os.Interrupt)
+	ooo.StreamBroadcastNoPatchTest(t, &server)
+}
+
 func TestGetN(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Parallel()
@@ -152,6 +176,32 @@ func TestBatchSet(t *testing.T) {
 	ooo.StorageBatchSetTest(server, t, 10)
 }
 
+func TestStreamPatch(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+	monotonic.Init()
+	server := &ooo.Server{}
+	server.Silence = true
+	server.Storage = newLayeredStorage("test/db_patch" + ooo.Time())
+	server.Start("localhost:0")
+	defer server.Close(os.Interrupt)
+	ooo.StreamBroadcastPatchTest(t, server)
+}
+
+func TestStreamLimitFilter(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+	monotonic.Init()
+	server := &ooo.Server{}
+	server.Silence = true
+	server.Storage = newLayeredStorage("test/db_limitfilter" + ooo.Time())
+	server.Start("localhost:0")
+	defer server.Close(os.Interrupt)
+	ooo.StreamLimitFilterTest(t, server)
+}
+
 func TestWatchStorageNoop(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Parallel()
@@ -162,6 +212,30 @@ func TestWatchStorageNoop(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	ooo.WatchStorageNoopTest(db, t)
+}
+
+func TestStorageBeforeRead(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+	monotonic.Init()
+	db := newLayeredStorage("test/db_beforeread" + ooo.Time())
+	err := db.Start(storage.Options{})
+	require.NoError(t, err)
+	defer db.Close()
+	ooo.StorageBeforeReadTest(db, t)
+}
+
+func TestStorageAfterWrite(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+	monotonic.Init()
+	db := newLayeredStorage("test/db_afterwrite" + ooo.Time())
+	err := db.Start(storage.Options{})
+	require.NoError(t, err)
+	defer db.Close()
+	ooo.StorageAfterWriteTest(db, t)
 }
 
 func TestClientCompatibility(t *testing.T) {
