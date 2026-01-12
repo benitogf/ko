@@ -3,7 +3,7 @@ module github.com/benitogf/ko
 go 1.25
 
 require (
-	github.com/benitogf/ooo v0.0.0-20260109055348-efad8e781ed7
+	github.com/benitogf/ooo v0.0.0-20260112125115-7022539caa4d
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.0
 )
