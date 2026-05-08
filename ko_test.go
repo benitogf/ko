@@ -5,11 +5,55 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/benitogf/go-json"
 	"github.com/benitogf/ooo"
 	"github.com/benitogf/ooo/monotonic"
 	"github.com/benitogf/ooo/storage"
 	"github.com/stretchr/testify/require"
 )
+
+// TestStorageExtendedKeyChars asserts that ko's leveldb-backed storage works
+// end-to-end with keys containing hyphens, dots, and underscores. ko ships
+// `key.Match` for glob lookups, so this also verifies glob iteration over
+// such keys.
+func TestStorageExtendedKeyChars(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Parallel()
+	}
+	monotonic.Init()
+	server := &ooo.Server{}
+	server.Silence = true
+	server.Storage = newLayeredStorage("test/db_extchars" + ooo.Time())
+	server.Start("localhost:0")
+	server.Storage.Clear()
+	defer server.Close(os.Interrupt)
+
+	keys := []string{
+		"users/john-doe",
+		"logs/2026-05-08",
+		"data/report.json",
+		"users/jane_doe",
+		"550e8400-e29b-41d4-a716-446655440000",
+	}
+
+	for _, k := range keys {
+		_, err := server.Storage.Set(k, json.RawMessage(`{"key":"`+k+`"}`))
+		require.NoError(t, err, "Set %q", k)
+
+		obj, err := server.Storage.Get(k)
+		require.NoError(t, err, "Get %q", k)
+		require.Contains(t, string(obj.Data), k)
+	}
+
+	// Verify glob iteration finds keys with the new characters.
+	users, err := server.Storage.GetList("users/*")
+	require.NoError(t, err)
+	require.Len(t, users, 2)
+
+	logs, err := server.Storage.GetList("logs/*")
+	require.NoError(t, err)
+	require.Len(t, logs, 1)
+}
 
 // newLayeredStorage creates a storage.Layered with memory + embedded layers
 func newLayeredStorage(path string) *storage.Layered {
