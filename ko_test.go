@@ -8,6 +8,7 @@ import (
 	"github.com/benitogf/go-json"
 	"github.com/benitogf/ooo"
 	"github.com/benitogf/ooo/monotonic"
+	"github.com/benitogf/ooo/oootest"
 	"github.com/benitogf/ooo/storage"
 	"github.com/stretchr/testify/require"
 )
@@ -72,8 +73,8 @@ func TestStorage(t *testing.T) {
 	server.Storage = newLayeredStorage("test/db")
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StorageListTest(server, t)
-	ooo.StorageObjectTest(server, t)
+	oootest.StorageListTest(server, t)
+	oootest.StorageObjectTest(server, t)
 }
 
 func TestStreamBroadcast(t *testing.T) {
@@ -88,7 +89,7 @@ func TestStreamBroadcast(t *testing.T) {
 	server.Start("localhost:0")
 	server.Storage.Clear()
 	defer server.Close(os.Interrupt)
-	ooo.StreamBroadcastTest(t, &server)
+	oootest.StreamBroadcastTest(t, &server)
 }
 
 func TestStreamGlobBroadcast(t *testing.T) {
@@ -103,7 +104,7 @@ func TestStreamGlobBroadcast(t *testing.T) {
 	app.Start("localhost:0")
 	app.Storage.Clear()
 	defer app.Close(os.Interrupt)
-	ooo.StreamGlobBroadcastTest(t, &app, 5)
+	oootest.StreamGlobBroadcastTest(t, &app, 5)
 }
 
 func TestStreamGlobBroadcastConcurrent(t *testing.T) {
@@ -117,7 +118,7 @@ func TestStreamGlobBroadcastConcurrent(t *testing.T) {
 	server.Storage = newLayeredStorage("test/db8" + ooo.Time())
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StreamGlobBroadcastConcurrentTest(t, &server, 3)
+	oootest.StreamGlobBroadcastConcurrentTest(t, &server, 3)
 }
 
 func TestStreamBroadcastFilter(t *testing.T) {
@@ -130,7 +131,7 @@ func TestStreamBroadcastFilter(t *testing.T) {
 	server.ForcePatch = true
 	server.Storage = newLayeredStorage("test/db3" + ooo.Time())
 	defer server.Close(os.Interrupt)
-	ooo.StreamBroadcastFilterTest(t, &server)
+	oootest.StreamBroadcastFilterTest(t, &server)
 }
 
 func TestStreamForcePatch(t *testing.T) {
@@ -142,7 +143,7 @@ func TestStreamForcePatch(t *testing.T) {
 	server.Silence = true
 	server.Storage = newLayeredStorage("test/db_forcepatch" + ooo.Time())
 	defer server.Close(os.Interrupt)
-	ooo.StreamBroadcastForcePatchTest(t, &server)
+	oootest.StreamBroadcastForcePatchTest(t, &server)
 }
 
 func TestStreamNoPatch(t *testing.T) {
@@ -154,7 +155,7 @@ func TestStreamNoPatch(t *testing.T) {
 	server.Silence = true
 	server.Storage = newLayeredStorage("test/db_nopatch" + ooo.Time())
 	defer server.Close(os.Interrupt)
-	ooo.StreamBroadcastNoPatchTest(t, &server)
+	oootest.StreamBroadcastNoPatchTest(t, &server)
 }
 
 func TestGetN(t *testing.T) {
@@ -165,7 +166,7 @@ func TestGetN(t *testing.T) {
 	server.Silence = true
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StorageGetNTest(server, t, 5)
+	oootest.StorageGetNTest(server, t, 5)
 }
 
 func TestGetNRange(t *testing.T) {
@@ -176,7 +177,7 @@ func TestGetNRange(t *testing.T) {
 	server.Silence = true
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StorageGetNRangeTest(server, t, 5)
+	oootest.StorageGetNRangeTest(server, t, 5)
 }
 
 func TestKeysRange(t *testing.T) {
@@ -189,7 +190,7 @@ func TestKeysRange(t *testing.T) {
 	server.Storage = newLayeredStorage("test/db4" + ooo.Time())
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StorageKeysRangeTest(server, t, 5)
+	oootest.StorageKeysRangeTest(server, t, 5)
 }
 
 func TestStreamItemGlobBroadcast(t *testing.T) {
@@ -204,7 +205,7 @@ func TestStreamItemGlobBroadcast(t *testing.T) {
 	server.Start("localhost:0")
 	server.Storage.Clear()
 	defer server.Close(os.Interrupt)
-	ooo.StreamItemGlobBroadcastTest(t, &server)
+	oootest.StreamItemGlobBroadcastTest(t, &server)
 }
 
 func TestBatchSet(t *testing.T) {
@@ -217,7 +218,7 @@ func TestBatchSet(t *testing.T) {
 	server.Storage = newLayeredStorage("test/db6" + ooo.Time())
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StorageBatchSetTest(server, t, 10)
+	oootest.StorageBatchSetTest(server, t, 10)
 }
 
 func TestStreamPatch(t *testing.T) {
@@ -230,7 +231,7 @@ func TestStreamPatch(t *testing.T) {
 	server.Storage = newLayeredStorage("test/db_patch" + ooo.Time())
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StreamBroadcastPatchTest(t, server)
+	oootest.StreamBroadcastPatchTest(t, server)
 }
 
 func TestStreamLimitFilter(t *testing.T) {
@@ -243,7 +244,7 @@ func TestStreamLimitFilter(t *testing.T) {
 	server.Storage = newLayeredStorage("test/db_limitfilter" + ooo.Time())
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.StreamLimitFilterTest(t, server)
+	oootest.StreamLimitFilterTest(t, server)
 }
 
 func TestWatchStorageNoop(t *testing.T) {
@@ -255,7 +256,7 @@ func TestWatchStorageNoop(t *testing.T) {
 	err := db.Start(storage.Options{})
 	require.NoError(t, err)
 	defer db.Close()
-	ooo.WatchStorageNoopTest(db, t)
+	oootest.WatchStorageNoopTest(db, t)
 }
 
 func TestStorageBeforeRead(t *testing.T) {
@@ -267,7 +268,7 @@ func TestStorageBeforeRead(t *testing.T) {
 	err := db.Start(storage.Options{})
 	require.NoError(t, err)
 	defer db.Close()
-	ooo.StorageBeforeReadTest(db, t)
+	oootest.StorageBeforeReadTest(db, t)
 }
 
 func TestStorageAfterWrite(t *testing.T) {
@@ -279,7 +280,7 @@ func TestStorageAfterWrite(t *testing.T) {
 	err := db.Start(storage.Options{})
 	require.NoError(t, err)
 	defer db.Close()
-	ooo.StorageAfterWriteTest(db, t)
+	oootest.StorageAfterWriteTest(db, t)
 }
 
 func TestClientCompatibility(t *testing.T) {
@@ -291,5 +292,5 @@ func TestClientCompatibility(t *testing.T) {
 	server.ForcePatch = true
 	server.Start("localhost:0")
 	defer server.Close(os.Interrupt)
-	ooo.ClientCompatibilityTest(t, server)
+	oootest.ClientCompatibilityTest(t, server)
 }

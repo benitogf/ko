@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/benitogf/go-json v0.0.0-20260410172501-727f5690408b
-	github.com/benitogf/ooo v0.0.0-20260512052235-a341c4f7c4d2
+	github.com/benitogf/ooo v0.0.0-20260605042519-e9ca7f0859ff
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.0
 )
